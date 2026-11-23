@@ -102,7 +102,7 @@ button.secondary{background:#e3ebe7;color:#183b35}button.danger{background:#fff0
  <div id="productList"></div>
 </section>
 <section id="editor" class="card">
- <div class="editor-heading"><button id="detailBack" class="secondary small" style="display:none" onclick="closeView()">← 뒤로가기</button><h2 id="editorTitle">제품 등록</h2></div>
+ <div class="editor-heading"><h2 id="editorTitle">제품 등록</h2></div>
  <div id="fields"></div>
  <div class="field"><label for="photoInput">제품 사진 등록</label>
   <input id="photoInput" type="file" accept="image/*" multiple><label for="photoInput" class="photo-pick-btn">📷 사진넣기</label>
@@ -111,6 +111,7 @@ button.secondary{background:#e3ebe7;color:#183b35}button.danger{background:#fff0
   <div id="photoPreview" class="photos"></div>
  </div>
  <div class="inline" id="editButtons"><button onclick="saveProduct()">저장</button><button class="secondary" onclick="closeEditor()">취소</button></div>
+  <button id="detailBack" class="secondary" style="display:none;width:100%;margin-top:18px;padding:15px" onclick="closeView()">← 뒤로가기</button>
 </section>
 </main></div>
 <section id="noticeScreen" style="display:none;min-height:100vh;background:#f3f6f4;padding:18px">
