@@ -124,7 +124,9 @@ button.secondary{background:#e3ebe7;color:#183b35}button.danger{background:#fff0
  <div id="noticeForm" class="card" style="display:none;margin-top:14px">
  <h2 id="noticeFormTitle">공지 작성</h2>
  <div class="field"><label for="noticeTitle">제목</label><input id="noticeTitle" maxlength="120" placeholder="공지 제목"></div>
+ <div class="field"><label for="noticeAuthor">작성자</label><input id="noticeAuthor" maxlength="40" placeholder="작성자 이름을 입력하세요"></div>
  <div class="field"><label for="noticeContent">내용</label><textarea id="noticeContent" rows="8" placeholder="공지 내용을 입력하세요" style="width:100%;box-sizing:border-box"></textarea></div>
+ <div class="field"><label for="noticePhotos">사진 첨부 (최대 2장)</label><input id="noticePhotos" type="file" accept="image/*" multiple onchange="previewNoticePhotos()"><div id="noticePhotoPreview" class="inline" style="margin-top:8px;flex-wrap:wrap"></div><div class="muted" style="font-size:12px">사진은 자동으로 용량을 줄여 저장합니다.</div></div>
  <div class="inline"><button id="noticeSaveButton" onclick="saveNotice()">저장</button><button class="secondary" onclick="closeNoticeForm()">취소</button></div>
  </div></div></section>
 <div id="photoLightbox" role="dialog" aria-modal="true" aria-label="사진 크게 보기" onclick="if(event.target===this)closePhoto()" style="display:none;position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.96);align-items:center;justify-content:center;flex-direction:column;padding:65px 12px 80px">
@@ -193,7 +195,7 @@ onAuthStateChanged(auth,async u=>{
 });
 </script>
 <script>
-let notices=[],noticeEditingId=null;
+let notices=[],noticeEditingId=null,noticePhotoData=[];
 function showSection(section){
  $('menuScreen').style.display=section==='menu'?'block':'none';
  $('appScreen').style.display=section==='products'?'block':'none';
@@ -207,12 +209,12 @@ async function refreshDashboardPreview(){
  const el=document.getElementById('dashboardNoticePreview');if(!el)return;
  try{if(window.noticeAPI){notices=await window.noticeAPI.load();notices.sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));}
  const recent=notices.slice(0,3);
- el.innerHTML=recent.length?recent.map(n=>`<div class="dash-preview-row" onclick="showSection('notices')"><span class="dash-preview-icon">◈</span><div style="min-width:0;flex:1"><div class="dash-preview-title">${safe(n.title)}</div><div class="dash-preview-date">${safe(noticeDate(n))}</div></div><span style="color:#9cacc0">›</span></div>`).join(''):'<p>아직 등록된 공지사항이 없습니다.</p>';
+ el.innerHTML=recent.length?recent.map(n=>`<div class="dash-preview-row" onclick="showSection('notices')"><span class="dash-preview-icon">◈</span><div style="min-width:0;flex:1"><div class="dash-preview-title">${safe(n.title)}</div><div class="dash-preview-date">${safe(n.author||"작성자 미입력")} · ${safe(noticeDate(n))}</div></div><span style="color:#9cacc0">›</span></div>`).join(''):'<p>아직 등록된 공지사항이 없습니다.</p>';
  }catch(e){el.innerHTML='<p>공지사항을 확인하려면 공지사항 메뉴를 눌러주세요.</p>';}
 }
 function noticeDate(n){const d=new Date(n.updatedAt||n.createdAt||0);return Number.isNaN(d.getTime())?'':d.toLocaleString('ko-KR',{timeZone:'Asia/Seoul'});}
 function renderNotices(){
- $('noticeList').innerHTML=notices.length?notices.map(n=>`<article class="card" style="margin:12px 0;padding:18px"><h3 style="margin:0 0 6px;overflow-wrap:anywhere">${safe(n.title)}</h3><div class="muted" style="font-size:12px;margin-bottom:10px">${safe(noticeDate(n))}</div><div style="white-space:pre-wrap;overflow-wrap:anywhere;margin-bottom:14px">${safe(n.content)}</div><div class="inline"><button class="secondary small" onclick="openNoticeForm('${n.id}')">수정</button><button class="secondary small" onclick="deleteNotice('${n.id}')">삭제</button></div></article>`).join(''):'<p class="muted">등록된 공지사항이 없습니다.</p>';
+ $('noticeList').innerHTML=notices.length?notices.map(n=>`<article class="card" style="margin:12px 0;padding:18px"><h3 style="margin:0 0 6px;overflow-wrap:anywhere">${safe(n.title)}</h3><div class="muted" style="font-size:12px;margin-bottom:10px">${safe(n.author||"작성자 미입력")} · ${safe(noticeDate(n))}</div><div style="white-space:pre-wrap;overflow-wrap:anywhere;margin-bottom:14px">${safe(n.content)}</div>${(n.photos||[]).length?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">${n.photos.map(src=>`<img src="${src}" alt="공지 사진" style="width:100px;height:100px;object-fit:cover;border-radius:12px" onclick="openPhoto('${src}')">`).join('')}</div>`:''}<div class="inline"><button class="secondary small" onclick="openNoticeForm('${n.id}')">수정</button><button class="secondary small" onclick="deleteNotice('${n.id}')">삭제</button></div></article>`).join(''):'<p class="muted">등록된 공지사항이 없습니다.</p>';
 }
 async function refreshNotices(){
  $('noticeStatus').textContent='공지사항을 불러오는 중…';
@@ -221,14 +223,34 @@ async function refreshNotices(){
 }
 function openNoticeForm(id){
  const n=id?notices.find(x=>x.id===id):null;noticeEditingId=n?n.id:null;
- $('noticeFormTitle').textContent=n?'공지 수정':'공지 작성';$('noticeTitle').value=n?n.title:'';$('noticeContent').value=n?n.content:'';
+ $('noticeFormTitle').textContent=n?'공지 수정':'공지 작성';$('noticeTitle').value=n?n.title:'';$('noticeContent').value=n?n.content:'';$('noticeAuthor').value=n?n.author||'':'';noticePhotoData=n?[...(n.photos||[])]:[];$('noticePhotos').value='';renderNoticePhotoPreview();
  $('noticeForm').style.display='block';$('noticeForm').scrollIntoView({behavior:'smooth',block:'start'});
+}
+function renderNoticePhotoPreview(){
+ $('noticePhotoPreview').innerHTML=noticePhotoData.map((src,i)=>`<div style="position:relative"><img src="${src}" alt="첨부 사진" style="width:85px;height:85px;object-fit:cover;border-radius:10px"><button type="button" class="small" style="position:absolute;right:0;top:0;padding:2px 7px" onclick="noticePhotoData.splice(${i},1);renderNoticePhotoPreview()">×</button></div>`).join('');
+}
+function compressNoticePhoto(file){
+ return new Promise((resolve,reject)=>{
+  const reader=new FileReader();reader.onerror=()=>reject(Error('사진 읽기 실패'));
+  reader.onload=()=>{const img=new Image();img.onerror=()=>reject(Error('사진 변환 실패'));img.onload=()=>{
+   const scale=Math.min(1,900/Math.max(img.width,img.height));const canvas=document.createElement('canvas');
+   canvas.width=Math.round(img.width*scale);canvas.height=Math.round(img.height*scale);
+   canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+   resolve(canvas.toDataURL('image/jpeg',0.55));
+  };img.src=reader.result;};reader.readAsDataURL(file);
+ });
+}
+async function previewNoticePhotos(){
+ const input=$('noticePhotos'),files=[...input.files];
+ if(files.length+noticePhotoData.length>2){toast('사진은 최대 2장까지 첨부할 수 있어요.');input.value='';return;}
+ try{for(const file of files){if(!file.type.startsWith('image/'))throw Error('이미지 파일만 첨부할 수 있어요.');noticePhotoData.push(await compressNoticePhoto(file));}renderNoticePhotoPreview();}
+ catch(e){toast(e.message);}finally{input.value='';}
 }
 function closeNoticeForm(){$('noticeForm').style.display='none';noticeEditingId=null;}
 async function saveNotice(){
- const title=$('noticeTitle').value.trim(),content=$('noticeContent').value.trim();if(!title||!content){toast('제목과 내용을 입력하세요.');return;}
+ const title=$('noticeTitle').value.trim(),content=$('noticeContent').value.trim(),author=$('noticeAuthor').value.trim();if(!title||!content||!author){toast('제목, 작성자, 내용을 입력하세요.');return;}
  const prev=notices.find(n=>n.id===noticeEditingId),now=new Date().toISOString();
- const n={id:noticeEditingId||('notice_'+Date.now()+'_'+Math.random().toString(36).slice(2,9)),title,content,createdAt:prev?.createdAt||now,updatedAt:now};
+ const n={id:noticeEditingId||('notice_'+Date.now()+'_'+Math.random().toString(36).slice(2,9)),title,content,author,photos:[...noticePhotoData],createdAt:prev?.createdAt||now,updatedAt:now};
  const b=$('noticeSaveButton');b.disabled=true;
  try{await window.noticeAPI.save(n);closeNoticeForm();await refreshNotices();toast('공지사항을 저장했습니다.');}
  catch(e){console.error(e);toast('공지 저장 실패: '+(e.code||e.message));}
