@@ -105,7 +105,7 @@ async function uploadPhotos(product){
 }
 window.cloudAPI={
  ready:async()=>{if(user)return true;throw new Error('로그인이 필요합니다.');},
- load:async()=>{const snap=await getDocs(col());return snap.docs.map(x=>x.data());},
+ load:async()=>{const snap=await getDocs(col());return snap.docs.map(x=>({...x.data(),id:x.id}));},
  save:async p=>{const photos=await uploadPhotos(p);const saved={...p,photos};await setDoc(itemRef(p.id),saved);return saved;},
  remove:async p=>{await deleteDoc(itemRef(p.id));for(const url of p.photos||[]){if(!url.startsWith('https://'))continue;try{await deleteObject(ref(storage,url));}catch(e){console.warn('사진 삭제 실패',e);}}}
 };
