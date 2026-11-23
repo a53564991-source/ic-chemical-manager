@@ -35,7 +35,7 @@ button.secondary{background:#e3ebe7;color:#183b35}button.danger{background:#fff0
 #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#172522;color:white;padding:10px 16px;border-radius:30px;display:none;z-index:5;font-size:13px;max-width:90%;text-align:center}
 .inline{display:flex;gap:8px}.inline>*{flex:1}
 .note{font-size:12px;color:#718079;line-height:1.5;margin-top:12px}
-#photoInput{padding:10px;background:#f8faf9}
+#photoInput{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden} .photo-pick-btn{display:inline-block;background:#173d35;color:white;padding:12px 22px;border-radius:12px;font-weight:700;cursor:pointer;margin-top:6px}
 @media(min-width:600px){.photos{grid-template-columns:repeat(4,1fr)}}
 .header-actions{display:flex;align-items:center;gap:8px}.header-refresh{background:#e3ebe7;color:#183b35;border-radius:12px;font-size:28px;width:48px;height:48px;padding:0;display:grid;place-items:center}.header-refresh:disabled{opacity:.55}
 </style>
@@ -60,7 +60,7 @@ button.secondary{background:#e3ebe7;color:#183b35}button.danger{background:#fff0
  <div class="inline" style="align-items:center"><h2 id="editorTitle" style="flex:1">제품 등록</h2><button class="secondary small" onclick="closeEditor()">닫기</button></div>
  <div id="fields"></div>
  <div class="field"><label for="photoInput">제품 사진 등록</label>
-  <input id="photoInput" type="file" accept="image/*" multiple>
+  <input id="photoInput" type="file" accept="image/*" multiple><label for="photoInput" class="photo-pick-btn">📷 사진넣기</label>
   <div class="muted" style="margin-top:6px">사진 선택 또는 카메라 촬영 후 사진이 아래에 표시되는지 확인하세요. 여러 장 등록할 수 있습니다.</div>
   <div id="photoStatus" class="muted" style="margin-top:6px"></div>
   <div id="photoPreview" class="photos"></div>
