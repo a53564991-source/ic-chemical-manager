@@ -283,7 +283,7 @@ async function deleteNotice(id){if(!confirm('이 공지사항을 삭제할까요
 function enterApp(){window.hasEnteredApp=true;document.getElementById('splash').style.display='none';showSection('menu');if(window.retryAnonymousLogin)window.retryAnonymousLogin();}
 const DB='product-characteristics-db', STORE='products';
 const categories=[
- {id:'name',name:'제품명'},{id:'pack',name:'포장방법'},{id:'viscosity',name:'점성'},
+ {id:'name',name:'제품명'},{id:'pack',name:'포장방법'},{id:'rawMaterials',name:'원료'},{id:'viscosity',name:'점성'},
  {id:'msds',name:'MSDS'},{id:'appearance',name:'색상 / 외관'},{id:'memo',name:'기타 특이사항'}
 ];
 let products=[], editingId=null, editPhotos=[];
