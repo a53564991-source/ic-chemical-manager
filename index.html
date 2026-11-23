@@ -195,6 +195,9 @@ function render(){
 function newProduct(){editingId=null;editPhotos=[];$('editorTitle').textContent='제품 등록';showEditor({});}
 function editProduct(id){let p=products.find(x=>x.id===id);if(!p)return;editingId=id;editPhotos=Array.isArray(p.photos)?[...p.photos]:[];$('editorTitle').textContent='제품 수정';showEditor(p.values||{});}
 function showEditor(values){
+ const oldViewActions=$('editor').querySelector('.viewActions');
+ if(oldViewActions)oldViewActions.remove();
+ $('photoInput').parentElement.style.display='';
  $('fields').innerHTML=categories.map(c=>`<div class="field"><label for="f_${c.id}">${safe(c.name)}</label><textarea id="f_${c.id}" data-cat="${c.id}" placeholder="${safe(c.name)} 내용을 입력하세요">${safe(values[c.id]||'')}</textarea></div>`).join('');
  $('photoInput').value='';$('photoStatus').textContent='현재 등록된 사진: '+editPhotos.length+'장';renderPhotos();
  $('home').style.display='none';$('editor').style.display='block';window.scrollTo(0,0);
