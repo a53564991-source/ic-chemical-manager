@@ -191,11 +191,13 @@ async function uploadPhotos(product){
 }
 window.workAPI={ready:()=>!!user,watch:(cb,err)=>onSnapshot(collection(db,'workProgress'),{includeMetadataChanges:true},snap=>cb(snap.docs.map(d=>({...d.data(),id:d.id})),snap.metadata),err),save:async d=>{if(!user)throw new Error('Firebase 연결 필요');await setDoc(doc(db,'workProgress',d.id),d);}};
 window.noticeAPI={
+ watch:(cb,err)=>onSnapshot(noticesCol(),cb,err),
  load:async()=>{const snap=await getDocs(noticesCol());return snap.docs.map(d=>({...d.data(),id:d.id}));},
  save:async n=>{await setDoc(doc(noticesCol(),n.id),n);},
  remove:async id=>{await deleteDoc(doc(noticesCol(),id));}
 };
 window.cloudAPI={
+ watch:(cb,err)=>onSnapshot(col(),cb,err),
  ready:async()=>{if(user)return true;throw new Error('Firebase 자동 연결이 필요합니다.');},
  load:async()=>{const snap=await getDocs(col());return snap.docs.map(x=>({...x.data(),id:x.id}));},
  save:async p=>{const photos=await uploadPhotos(p);const saved={...p,photos};await setDoc(itemRef(p.id),saved);return saved;},
@@ -209,18 +211,20 @@ window.retryAnonymousLogin=async()=>{
 };
 onAuthStateChanged(auth,async u=>{
  user=u;
+ if(window.stopLiveSync)window.stopLiveSync();
  
  document.getElementById('appScreen').style.display='none';
   document.getElementById('menuScreen').style.display=window.hasEnteredApp?'block':'none';
   document.getElementById('noticeScreen').style.display='none';
  document.getElementById('splash').style.display=window.hasEnteredApp?'none':'flex';
- if(u){document.getElementById('startupConnectionStatus').style.display='none';window.finishStartup();state('☁ Firebase 연결됨');if(window.refreshCloud)await window.refreshCloud();if(window.refreshDashboardPreview)window.refreshDashboardPreview();}
+ if(u){document.getElementById('startupConnectionStatus').style.display='none';window.finishStartup();state('☁ Firebase 연결됨');if(window.startLiveSync)window.startLiveSync();}
  else {state('Firebase 연결 대기 중…');window.retryAnonymousLogin();}
 });
 </script>
 <script>
 let notices=[],noticeEditingId=null,noticePhotoData=[];
 function showSection(section){
+ if(window.hasEnteredApp && section!=='menu') armBack();
  $('workScreen').style.display=section==='work'?'block':'none';
  if(section==='work')workOpen();else if(workUnsub){workUnsub();workUnsub=null;}
  $('menuScreen').style.display=section==='menu'?'block':'none';
@@ -234,9 +238,11 @@ function showSection(section){
 async function refreshDashboardPreview(){
  const el=document.getElementById('dashboardNoticePreview');if(!el)return;
  try{if(window.noticeAPI){notices=await window.noticeAPI.load();notices.sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));}
- const recent=notices.slice(0,3);
- el.innerHTML=recent.length?recent.map(n=>`<div class="dash-preview-row" onclick="showSection('notices')"><span class="dash-preview-icon">◈</span><div style="min-width:0;flex:1"><div class="dash-preview-title">${safe(n.title)}</div><div class="dash-preview-date">${safe(n.author||"작성자 미입력")} · ${safe(noticeDate(n))}</div></div><span style="color:#9cacc0">›</span></div>`).join(''):'<p>아직 등록된 공지사항이 없습니다.</p>';
+ renderDashboardNotices();
  }catch(e){el.innerHTML='<p>공지사항을 확인하려면 공지사항 메뉴를 눌러주세요.</p>';}
+}
+function renderDashboardNotices(){const el=$('dashboardNoticePreview'); const recent=notices.slice(0,3);
+ el.innerHTML=recent.length?recent.map(n=>`<div class="dash-preview-row" onclick="showSection('notices')"><span class="dash-preview-icon">◈</span><div style="min-width:0;flex:1"><div class="dash-preview-title">${safe(n.title)}</div><div class="dash-preview-date">${safe(n.author||"작성자 미입력")} · ${safe(noticeDate(n))}</div></div><span style="color:#9cacc0">›</span></div>`).join(''):'<p>아직 등록된 공지사항이 없습니다.</p>';
 }
 function noticeDate(n){const d=new Date(n.updatedAt||n.createdAt||0);return Number.isNaN(d.getTime())?'':d.toLocaleString('ko-KR',{timeZone:'Asia/Seoul'});}
 function renderNotices(){
@@ -283,7 +289,7 @@ async function saveNotice(){
  finally{b.disabled=false;}
 }
 async function deleteNotice(id){if(!confirm('이 공지사항을 삭제할까요?'))return;try{await window.noticeAPI.remove(id);await refreshNotices();toast('공지사항을 삭제했습니다.');}catch(e){console.error(e);toast('삭제 실패: '+(e.code||e.message));}}
-function enterApp(){window.hasEnteredApp=true;document.getElementById('splash').style.display='none';showSection('menu');if(window.retryAnonymousLogin)window.retryAnonymousLogin();}
+function enterApp(){window.hasEnteredApp=true;armBack();document.getElementById('splash').style.display='none';showSection('menu');if(window.retryAnonymousLogin)window.retryAnonymousLogin();}
 const DB='product-characteristics-db', STORE='products';
 const categories=[
  {id:'name',name:'제품명'},{id:'pack',name:'포장방법'},{id:'rawMaterials',name:'원료'},{id:'viscosity',name:'점성'},
@@ -463,5 +469,31 @@ function workAdd(){const s=prompt('추가할 공정 이름')?.trim();if(!s)retur
 function workBack(){workSelected=null;workRender();}
 async function workSave(){const id=workSelected;if(!id)return;const stage=$('workStages').value,status=$('workState').value,start=$('workStart').value;const prev=workData[id]||{};if(status==='진행 중'&&['숙성','세정'].includes(stage)&&!start){alert('시작시간을 입력해 주세요.');return;}if(start&&new Date(start)>new Date()){alert('시작시간이 미래입니다.');return;}const d={id,product:$('workProduct').value.trim(),stage,status,start:start?new Date(start).toISOString():'',end:status==='완료'?(prev.status==='완료'&&prev.stage===stage&&prev.end?prev.end:new Date().toISOString()):'',memo:$('workMemo').value,categories:[...$('workStages').options].map(o=>o.value).filter(s=>!baseStages.includes(s)),updatedAt:new Date().toISOString()};const b=$('workSaveButton');b.disabled=true;try{await window.workAPI.save(d);workData[id]=d;workBack();toast('작업현황 저장 완료');}catch(e){alert('저장 실패: '+(e.code||e.message));}finally{b.disabled=false;}}
 setInterval(workTick,1000);
+
+let liveStops=[], liveQueue=Promise.resolve(), liveRetry;
+window.stopLiveSync=()=>{clearTimeout(liveRetry);liveStops.forEach(f=>f());liveStops=[];};
+window.startLiveSync=()=>{
+ window.stopLiveSync();
+ const fail=e=>{console.error(e);$('cloudStatus').textContent='실시간 연결 실패: '+(e.code||e.message);$('noticeStatus').textContent='실시간 연결 실패';clearTimeout(liveRetry);liveRetry=setTimeout(window.startLiveSync,5000);};
+ try{
+ liveStops.push(window.cloudAPI.watch(snap=>{liveQueue=liveQueue.then(async()=>{
+ if(snap.metadata.fromCache)return;
+ for(const change of snap.docChanges()){if(change.type==='removed')await del(change.doc.id);else await put({...change.doc.data(),id:change.doc.id});}
+ products=await all();render();$('cloudStatus').textContent='☁ 실시간 공유 연결됨 · 제품 '+snap.size+'개';
+ }).catch(fail);},fail));
+ liveStops.push(window.noticeAPI.watch(snap=>{notices=snap.docs.map(d=>({...d.data(),id:d.id})).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));renderNotices();renderDashboardNotices();$('noticeStatus').textContent='☁ 실시간 공유 공지사항 '+notices.length+'개';},fail));
+ }catch(e){fail(e);}
+};
+function armBack(){if(!history.state?.icBack)history.pushState({icBack:true},'');}
+window.addEventListener('popstate',()=>{
+ if(!window.hasEnteredApp)return;
+ armBack();
+ if($('photoLightbox').style.display==='flex'){closePhoto();return;}
+ if($('workScreen').style.display!=='none'&&workSelected){workBack();return;}
+ if($('noticeScreen').style.display!=='none'&&$('noticeForm').style.display==='block'){closeNoticeForm();return;}
+ if($('appScreen').style.display!=='none'&&$('editor').style.display==='block'){closeView();return;}
+ showSection('menu');
+});
+
 
 </script></body></html>
