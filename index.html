@@ -105,7 +105,7 @@ button.secondary{background:#e3ebe7;color:#183b35}button.danger{background:#fff0
 
 <main>
 <section id="home">
- <div id="cloudStatus" class="muted" style="margin-bottom:12px">Firebase 연결 중…</div>
+ <div id="cloudStatus" class="muted" style="margin-bottom:12px">Firebase 연결 중…</div><button class="secondary small" onclick="uploadExistingProducts()" style="margin-top:6px">기존 제품 공유</button>
  <div class="searchbox"><input id="search" type="search" aria-label="제품 검색" placeholder="⌕  제품 검색" autocomplete="off"></div>
  <div id="productList"></div>
 </section>
@@ -197,7 +197,7 @@ window.noticeAPI={
  remove:async id=>{await deleteDoc(doc(noticesCol(),id));}
 };
 window.cloudAPI={
- watch:(cb,err)=>onSnapshot(col(),cb,err),
+ watch:(cb,err)=>onSnapshot(col(),{includeMetadataChanges:true},cb,err),
  ready:async()=>{if(user)return true;throw new Error('Firebase 자동 연결이 필요합니다.');},
  load:async()=>{const snap=await getDocs(col());return snap.docs.map(x=>({...x.data(),id:x.id}));},
  save:async p=>{const photos=await uploadPhotos(p);const saved={...p,photos};await setDoc(itemRef(p.id),saved);return saved;},
@@ -232,7 +232,7 @@ function showSection(section){
  $('noticeScreen').style.display=section==='notices'?'block':'none';
  if(section==='notices')refreshNotices();
  if(section==='menu')refreshDashboardPreview();
- if(section==='products' && typeof closeEditor==='function')closeEditor();
+ if(section==='products' && typeof closeEditor==='function'){closeEditor();if(window.cloudAPI)window.refreshCloud();}
  window.scrollTo(0,0);
 }
 async function refreshDashboardPreview(){
@@ -389,6 +389,10 @@ $('photoInput').addEventListener('change',async e=>{
  }catch(err){toast('사진을 불러오지 못했습니다. 다른 사진 파일로 다시 시도해 주세요.')}
  e.target.value='';
 });
+async function uploadExistingProducts(){
+ if(!confirm('이 휴대폰에만 저장된 제품을 Firebase에 공유할까요? 기존 서버 제품은 덮어쓰지 않습니다.'))return;
+ try{await window.cloudAPI.ready();const remote=await window.cloudAPI.load();const ids=new Set(remote.map(p=>p.id));let count=0;for(const p of await all()){if(!ids.has(p.id)){const saved=await window.cloudAPI.save(p);await put(saved);count++;}}await window.refreshCloud();alert(count+'개 제품 공유 완료');}catch(e){alert('공유 실패: '+(e.code||e.message));}
+}
 async function saveProduct(){
  const values={};document.querySelectorAll('#fields textarea').forEach(el=>values[el.dataset.cat]=el.value.trim());
  if(!values.name){toast('제품명을 입력해 주세요.');$('f_name').focus();return}
@@ -396,11 +400,11 @@ async function saveProduct(){
  const now=new Date().toISOString();
  const p={...(previous||{}),id:editingId||('p_'+Date.now()+'_'+Math.random().toString(36).slice(2)),values,photos:editPhotos,createdAt:previous?.createdAt||previous?.created_at||now,updatedAt:now};
  try{
-   await put(p);products=await all();closeEditor();render();
+   await put(p);products=await all();render();
    if(window.cloudAPI){
-    try{await window.cloudAPI.ready();const saved=await window.cloudAPI.save(p);await put(saved);products=await all();render();toast('Firebase에 저장됐습니다.');}
+    try{await window.cloudAPI.ready();const saved=await window.cloudAPI.save(p);await put(saved);products=await all();closeEditor();render();toast('Firebase에 저장됐습니다.');}
     catch(e){console.error(e);toast('휴대폰에 저장됨 · Firebase 저장 실패');document.getElementById('cloudStatus').textContent='⚠ Firebase 저장 실패: '+(e.code||e.message);}
-   }else toast('휴대폰에 저장됐습니다.');
+   }else toast('휴대폰에만 저장됨 · Firebase 연결 필요');
   }
  catch(err){console.error(err);toast('저장 공간이 부족하거나 저장 오류가 발생했습니다. 사진 수를 줄여 다시 시도해 주세요.')}
 }
@@ -478,7 +482,8 @@ window.startLiveSync=()=>{
  try{
  liveStops.push(window.cloudAPI.watch(snap=>{liveQueue=liveQueue.then(async()=>{
  if(snap.metadata.fromCache)return;
- for(const change of snap.docChanges()){if(change.type==='removed')await del(change.doc.id);else await put({...change.doc.data(),id:change.doc.id});}
+ for(const change of snap.docChanges()){if(change.type==='removed')await del(change.doc.id);}
+ for(const d of snap.docs)await put({...d.data(),id:d.id});
  products=await all();render();$('cloudStatus').textContent='☁ 실시간 공유 연결됨 · 제품 '+snap.size+'개';
  }).catch(fail);},fail));
  liveStops.push(window.noticeAPI.watch(snap=>{notices=snap.docs.map(d=>({...d.data(),id:d.id})).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));renderNotices();renderDashboardNotices();$('noticeStatus').textContent='☁ 실시간 공유 공지사항 '+notices.length+'개';},fail));
