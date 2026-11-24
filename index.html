@@ -198,9 +198,9 @@ window.noticeAPI={
 };
 window.cloudAPI={
  watch:(cb,err)=>onSnapshot(col(),{includeMetadataChanges:true},cb,err),
- ready:async()=>{if(user)return true;throw new Error('Firebase 자동 연결이 필요합니다.');},
+ ready:async()=>{for(let i=0;i<40&&!user;i++)await new Promise(r=>setTimeout(r,250));if(user)return true;throw new Error('Firebase 자동 연결이 필요합니다.');},
  load:async()=>{const snap=await getDocs(col());return snap.docs.map(x=>({...x.data(),id:x.id}));},
- save:async p=>{const photos=await uploadPhotos(p);const saved={...p,photos};await setDoc(itemRef(p.id),saved);return saved;},
+ save:async p=>{const photos=await uploadPhotos(p);const saved={...p,photos};delete saved.localPending;await setDoc(itemRef(p.id),saved);return saved;},
  remove:async p=>{await deleteDoc(itemRef(p.id));for(const url of p.photos||[]){if(!url.startsWith('https://'))continue;try{await deleteObject(ref(storage,url));}catch(e){console.warn('사진 삭제 실패',e);}}}
 };
 window.retryAnonymousLogin=async()=>{
@@ -210,13 +210,16 @@ window.retryAnonymousLogin=async()=>{
  catch(e){window.finishStartup();console.error(e);document.getElementById('startupConnectionStatus').style.display='block';if(msg)msg.textContent='Firebase 연결 실패 ('+(e.code||e.message)+')';}
 };
 onAuthStateChanged(auth,async u=>{
+ const alreadyEntered=window.hasEnteredApp;
  user=u;
  if(window.stopLiveSync)window.stopLiveSync();
  
+ if(!alreadyEntered){
  document.getElementById('appScreen').style.display='none';
   document.getElementById('menuScreen').style.display=window.hasEnteredApp?'block':'none';
   document.getElementById('noticeScreen').style.display='none';
  document.getElementById('splash').style.display=window.hasEnteredApp?'none':'flex';
+ }
  if(u){document.getElementById('startupConnectionStatus').style.display='none';window.finishStartup();state('☁ Firebase 연결됨');if(window.startLiveSync)window.startLiveSync();}
  else {state('Firebase 연결 대기 중…');window.retryAnonymousLogin();}
 });
@@ -289,7 +292,7 @@ async function saveNotice(){
  finally{b.disabled=false;}
 }
 async function deleteNotice(id){if(!confirm('이 공지사항을 삭제할까요?'))return;try{await window.noticeAPI.remove(id);await refreshNotices();toast('공지사항을 삭제했습니다.');}catch(e){console.error(e);toast('삭제 실패: '+(e.code||e.message));}}
-function enterApp(){window.hasEnteredApp=true;armBack();document.getElementById('splash').style.display='none';showSection('menu');if(window.retryAnonymousLogin)window.retryAnonymousLogin();}
+function enterApp(){window.hasEnteredApp=true;armBack();document.getElementById('splash').style.display='none';showSection('menu');if(!window.cloudAPI && window.retryAnonymousLogin)window.retryAnonymousLogin();}
 const DB='product-characteristics-db', STORE='products';
 const categories=[
  {id:'name',name:'제품명'},{id:'pack',name:'포장방법'},{id:'rawMaterials',name:'원료'},{id:'viscosity',name:'점성'},
@@ -390,23 +393,24 @@ $('photoInput').addEventListener('change',async e=>{
  e.target.value='';
 });
 async function uploadExistingProducts(){
- if(!confirm('이 휴대폰에만 저장된 제품을 Firebase에 공유할까요? 기존 서버 제품은 덮어쓰지 않습니다.'))return;
- try{await window.cloudAPI.ready();const remote=await window.cloudAPI.load();const ids=new Set(remote.map(p=>p.id));let count=0;for(const p of await all()){if(!ids.has(p.id)){const saved=await window.cloudAPI.save(p);await put(saved);count++;}}await window.refreshCloud();alert(count+'개 제품 공유 완료');}catch(e){alert('공유 실패: '+(e.code||e.message));}
+ if(!confirm('이 휴대폰에만 저장된 제품을 Firebase에 공유할까요? 미공유 제품과 저장 실패한 수정 내용을 전송합니다.'))return;
+ try{if(!window.cloudAPI)throw Error('Firebase 연결 대기 중');await window.cloudAPI.ready();const remote=await window.cloudAPI.load();const ids=new Set(remote.map(p=>p.id));let count=0;for(const p of await all()){if(!ids.has(p.id)||p.localPending){const saved=await window.cloudAPI.save(p);await put(saved);count++;}}await window.refreshCloud();alert(count+'개 제품 공유 완료');}catch(e){alert('공유 실패: '+(e.code||e.message));}
 }
 async function saveProduct(){
+ const button=$('editButtons').querySelector('button');if(button.disabled)return;
  const values={};document.querySelectorAll('#fields textarea').forEach(el=>values[el.dataset.cat]=el.value.trim());
- if(!values.name){toast('제품명을 입력해 주세요.');$('f_name').focus();return}
+ if(!values.name){toast('제품명을 입력해 주세요.');return;}
  const previous=editingId?products.find(x=>x.id===editingId):null;
  const now=new Date().toISOString();
- const p={...(previous||{}),id:editingId||('p_'+Date.now()+'_'+Math.random().toString(36).slice(2)),values,photos:editPhotos,createdAt:previous?.createdAt||previous?.created_at||now,updatedAt:now};
+ const p={...(previous||{}),id:editingId||('p_'+Date.now()+'_'+Math.random().toString(36).slice(2)),values,photos:[...editPhotos],createdAt:previous?.createdAt||previous?.created_at||now,updatedAt:now};
+ button.disabled=true;button.textContent='저장 중…';editingId=p.id;
  try{
-   await put(p);products=await all();render();
-   if(window.cloudAPI){
-    try{await window.cloudAPI.ready();const saved=await window.cloudAPI.save(p);await put(saved);products=await all();closeEditor();render();toast('Firebase에 저장됐습니다.');}
-    catch(e){console.error(e);toast('휴대폰에 저장됨 · Firebase 저장 실패');document.getElementById('cloudStatus').textContent='⚠ Firebase 저장 실패: '+(e.code||e.message);}
-   }else toast('휴대폰에만 저장됨 · Firebase 연결 필요');
-  }
- catch(err){console.error(err);toast('저장 공간이 부족하거나 저장 오류가 발생했습니다. 사진 수를 줄여 다시 시도해 주세요.')}
+ await put({...p,localPending:true});
+ if(!window.cloudAPI)throw Error('Firebase 연결 대기 중');
+ await window.cloudAPI.ready();
+ const saved=await window.cloudAPI.save(p);await put(saved);products=await all();closeEditor();toast('서버 저장 및 공유 완료');
+ }catch(e){console.error(e);alert('서버 저장 실패: '+(e.code||e.message)+'\n입력 내용은 유지됩니다. 다시 저장해 주세요.');}
+ finally{button.disabled=false;button.textContent='저장';}
 }
 function viewProduct(id){
  $('detailBack').style.display='inline-block';$('editButtons').style.display='none';
@@ -449,7 +453,7 @@ window.refreshCloud=async()=>{
  try{
   const cloud=await window.cloudAPI.load();
   // 이전 휴대폰 데이터는 삭제하지 않고, 클라우드에 있는 항목만 병합합니다.
-  for(const p of cloud)await put(p);
+  const pending=new Set((await all()).filter(p=>p.localPending).map(p=>p.id));for(const p of cloud)if(!pending.has(p.id))await put(p);
   products=await all();render();
   document.getElementById('cloudStatus').textContent='☁ Firebase 연결됨 · 제품 '+cloud.length+'개 동기화';
  }catch(e){console.error(e);document.getElementById('cloudStatus').textContent='⚠ Firebase 읽기 실패: '+(e.code||e.message);}
@@ -483,7 +487,7 @@ window.startLiveSync=()=>{
  liveStops.push(window.cloudAPI.watch(snap=>{liveQueue=liveQueue.then(async()=>{
  if(snap.metadata.fromCache)return;
  for(const change of snap.docChanges()){if(change.type==='removed')await del(change.doc.id);}
- for(const d of snap.docs)await put({...d.data(),id:d.id});
+ const pending=new Set((await all()).filter(p=>p.localPending).map(p=>p.id));for(const d of snap.docs)if(!pending.has(d.id))await put({...d.data(),id:d.id});
  products=await all();render();$('cloudStatus').textContent='☁ 실시간 공유 연결됨 · 제품 '+snap.size+'개';
  }).catch(fail);},fail));
  liveStops.push(window.noticeAPI.watch(snap=>{notices=snap.docs.map(d=>({...d.data(),id:d.id})).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));renderNotices();renderDashboardNotices();$('noticeStatus').textContent='☁ 실시간 공유 공지사항 '+notices.length+'개';},fail));
