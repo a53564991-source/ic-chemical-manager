@@ -180,12 +180,16 @@ function col(){if(!user)throw new Error('Firebase 자동 연결이 필요합니�
 function itemRef(id){return doc(col(),id);}
 function noticesCol(){if(!user)throw new Error('Firebase 연결이 필요합니다.');return collection(db,'notices');}
 function photoPath(id){return `users/${user.uid}/products/${id}/${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`;}
+function bounded(promise,label,ms=15000){let timer;return Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(label+' 시간 초과 (서버 확인 필요)')),ms);})]).finally(()=>clearTimeout(timer));}
 async function uploadPhotos(product){
- const result=[];
- for(const src of product.photos||[]){
-  if(!src.startsWith('data:')){result.push(src);continue;}
-  const path=photoPath(product.id),fileRef=ref(storage,path);
-  await uploadString(fileRef,src,'data_url');result.push(await getDownloadURL(fileRef));
+ const photos=product.photos||[];const result=[];
+ const budget=Math.floor(750000/Math.max(1,photos.length));
+ for(const src of photos){
+  if(!src.startsWith('data:')||src.length<=budget){result.push(src);continue;}
+  const img=new Image();await bounded(new Promise((ok,fail)=>{img.onload=ok;img.onerror=()=>fail(Error('사진 읽기 실패'));img.src=src;}),'사진 변환',5000);
+  let size=1000,output=src;
+  while(output.length>budget&&size>=64){const c=document.createElement('canvas');const scale=Math.min(1,size/Math.max(img.width,img.height));c.width=Math.max(1,Math.round(img.width*scale));c.height=Math.max(1,Math.round(img.height*scale));c.getContext('2d').drawImage(img,0,0,c.width,c.height);output=c.toDataURL('image/jpeg',0.55);size=Math.floor(size*0.7);}
+  if(output.length>budget)throw Error('사진 용량이 너무 큽니다. 사진 수를 줄여 주세요.');result.push(output);
  }
  return result;
 }
@@ -199,8 +203,8 @@ window.noticeAPI={
 window.cloudAPI={
  watch:(cb,err)=>onSnapshot(col(),{includeMetadataChanges:true},cb,err),
  ready:async()=>{for(let i=0;i<40&&!user;i++)await new Promise(r=>setTimeout(r,250));if(user)return true;throw new Error('Firebase 자동 연결이 필요합니다.');},
- load:async()=>{const snap=await getDocs(col());return snap.docs.map(x=>({...x.data(),id:x.id}));},
- save:async p=>{const photos=await uploadPhotos(p);const saved={...p,photos};delete saved.localPending;await setDoc(itemRef(p.id),saved);return saved;},
+ load:async()=>{const snap=await bounded(getDocs(col()),'제품 목록 읽기');return snap.docs.map(x=>({...x.data(),id:x.id}));},
+ save:async p=>{const photos=await uploadPhotos(p);const saved={...p,photos};delete saved.localPending;if(new TextEncoder().encode(JSON.stringify(saved)).length>900000)throw Error('제품 데이터 용량 초과');await bounded(setDoc(itemRef(p.id),saved),'제품 서버 저장');return saved;},
  remove:async p=>{await deleteDoc(itemRef(p.id));for(const url of p.photos||[]){if(!url.startsWith('https://'))continue;try{await deleteObject(ref(storage,url));}catch(e){console.warn('사진 삭제 실패',e);}}}
 };
 window.retryAnonymousLogin=async()=>{
@@ -394,7 +398,7 @@ $('photoInput').addEventListener('change',async e=>{
 });
 async function uploadExistingProducts(){
  if(!confirm('이 휴대폰에만 저장된 제품을 Firebase에 공유할까요? 미공유 제품과 저장 실패한 수정 내용을 전송합니다.'))return;
- try{if(!window.cloudAPI)throw Error('Firebase 연결 대기 중');await window.cloudAPI.ready();const remote=await window.cloudAPI.load();const ids=new Set(remote.map(p=>p.id));let count=0;for(const p of await all()){if(!ids.has(p.id)||p.localPending){const saved=await window.cloudAPI.save(p);await put(saved);count++;}}await window.refreshCloud();alert(count+'개 제품 공유 완료');}catch(e){alert('공유 실패: '+(e.code||e.message));}
+ try{if(!window.cloudAPI)throw Error('Firebase 연결 대기 중');await window.cloudAPI.ready();const remote=await window.cloudAPI.load();const ids=new Set(remote.map(p=>p.id));let count=0;for(const p of await all()){if(!ids.has(p.id)||p.localPending){const saved=await window.cloudAPI.save(p);await put(saved);count++;}}alert(count+'개 제품 공유 완료');await window.refreshCloud();}catch(e){alert('공유 실패: '+(e.code||e.message));}
 }
 async function saveProduct(){
  const button=$('editButtons').querySelector('button');if(button.disabled)return;
