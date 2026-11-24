@@ -550,4 +550,43 @@ async function scOrderEdit(id){const d=scData.find(x=>x.id===id);const month=pro
 
 function scCompanyOptions(){const names=[...new Set(scData.filter(x=>['TR','TR_COMPANY'].includes(x.type)&&x.company).map(x=>x.company))].sort();$('scCompanies').replaceChildren(...names.map(n=>{const o=document.createElement('option');o.value=n;return o;}));}
 async function scAddCompany(){const name=prompt('회사 / 공급업체 이름')?.trim();if(!name)return;try{if(!scData.some(x=>['TR','TR_COMPANY'].includes(x.type)&&x.company===name))await window.scheduleAPI.save({id:'tr_company_'+encodeURIComponent(name),type:'TR_COMPANY',company:name,date:workLocal(new Date()).slice(0,10)});$('scCompany').value=name;toast('업체 추가 완료');}catch(e){toast('업체 추가 실패: '+e.message);}}
-</script></body></html>
+</script><style id="web-pastel-theme">
+html[data-layout="web"]{background:#e8eef5}
+html[data-layout="web"] body{background:#e8eef5}
+html[data-layout="web"] #menuScreen{background:#e8eef5}
+html[data-layout="web"] #menuScreen .dash-tile{border:1px solid #b9cce5;background:#e3edfc;color:#25476e;box-shadow:0 3px 12px #203c5810}
+html[data-layout="web"] #menuScreen .dash-tile.notices{background:#eee5f7;border-color:#d3c3e5;color:#65517e}
+html[data-layout="web"] #menuScreen .dash-tile[onclick*="'work'"]{background:#dfeee7;border-color:#b2d1c2;color:#285d50}
+html[data-layout="web"] #menuScreen .dash-tile[onclick*="'schedule'"]{background:#f7ead7;border-color:#dec8a7;color:#806440}
+html[data-layout="web"] .dash-notice-preview{border:1px solid #c8d5e5;background:#f8faff}
+html[data-layout="web"] #appScreen{--accent:#376da9;--edge:#bccfe5;--paper:#f7faff;--wash:#e7eff9;background:var(--wash)}
+html[data-layout="web"] #workScreen{--accent:#367b68;--edge:#b1cfc1;--paper:#f4faf6;--wash:#e5efe9;background:var(--wash)}
+html[data-layout="web"] #noticeScreen{--accent:#8067a1;--edge:#d3c8e2;--paper:#fcfaff;--wash:#eee9f4;background:var(--wash)!important}
+html[data-layout="web"] #scheduleScreen{--accent:#526e91;--edge:#b9c9dc;--paper:#f8faff;--wash:#e8eef5;background:var(--wash)}
+html[data-layout="web"] #scheduleScreen:has(#scTabs button.active[onclick*="'TR'"]){--accent:#95713e;--edge:#d8c9b1;--paper:#fffaf2;--wash:#f2ebdf}
+html[data-layout="web"] #appScreen header,html[data-layout="web"] #workScreen header{background:var(--accent)!important;color:white;border-bottom:1px solid var(--edge)}
+html[data-layout="web"] #appScreen header p,html[data-layout="web"] #workScreen header p{color:#fff}
+html[data-layout="web"] #appScreen .card,html[data-layout="web"] #workScreen .card,html[data-layout="web"] #noticeScreen .card,html[data-layout="web"] #scForm,html[data-layout="web"] #scheduleScreen .sc-row{background:var(--paper);border:1px solid var(--edge)!important;border-radius:12px;padding:18px!important;margin:12px 0;box-shadow:0 3px 10px #203c5808}
+html[data-layout="web"] #noticeScreen .notice-article{border-left:4px solid var(--accent)!important}
+html[data-layout="web"] #noticeScreen .notice-heading,html[data-layout="web"] #scheduleScreen h1{color:var(--accent)!important}
+html[data-layout="web"] :is(#appScreen,#workScreen,#noticeScreen,#scheduleScreen) :is(input,textarea,select){background:var(--paper);border:1px solid var(--edge);color:#24364b}
+html[data-layout="web"] :is(#appScreen,#workScreen,#noticeScreen,#scheduleScreen) .field{border-bottom:1px solid var(--edge);padding:12px 0}
+html[data-layout="web"] :is(#appScreen,#workScreen,#noticeScreen,#scheduleScreen) button.secondary{background:var(--wash);border:1px solid var(--edge);color:var(--accent)}
+html[data-layout="web"] #workGrid .work-unit{background:#f4faf6;border:1px solid #b1cfc1;border-left:4px solid #719b89;padding:18px}
+html[data-layout="web"] #workGrid .work-unit:has(b[style*="#2563eb"]){background:#edf4fc;border-color:#a9c4e4}
+html[data-layout="web"] #workGrid .work-unit:has(b[style*="#c56b12"]){background:#fff5e4;border-color:#ddc69e}
+html[data-layout="web"] #workGrid .work-unit:has(b[style*="#64748b"]){background:#f3f5f7;border-color:#c6cfd8}
+html[data-layout="web"] #scTabs button{border:1px solid var(--edge);background:var(--paper);color:var(--accent)}
+html[data-layout="web"] #scTabs button.active,html[data-layout="web"] #scAdd,html[data-layout="web"] #scSave{background:var(--accent);color:white}
+html[data-layout="web"] .wk-scroll{border:1px solid #a9bdd4;background:#f7faff}
+html[data-layout="web"] .wk-table thead th{background:#344e70;color:white;border-color:#7890ac}
+html[data-layout="web"] .wk-table tbody tr:nth-child(3n+1)>*{background:#e4eefb}
+html[data-layout="web"] .wk-table tbody tr:nth-child(3n+2)>*{background:#e5f2eb}
+html[data-layout="web"] .wk-table tbody tr:nth-child(3n)>*{background:#fbf0df}
+html[data-layout="web"] .wk-table tbody tr>*{border:1px solid #b9c9dc;color:#344e70}
+html[data-layout="web"] .wk-table tbody td:last-child{box-shadow:inset 0 0 0 999px #344e7010;font-weight:bold}
+html[data-layout="web"] #scheduleScreen .sc-row small{display:inline-block;background:var(--wash);color:var(--accent);padding:6px 10px;border-radius:6px}
+@media(min-width:850px){html[data-layout="web"] #workScreen main{max-width:1050px}html[data-layout="web"] #workGrid{grid-template-columns:repeat(3,minmax(0,1fr))}html[data-layout="web"] #noticeScreen{max-width:1050px;margin:auto}html[data-layout="web"] #menuScreen .dash-body>.dash-tile{display:inline-flex;width:calc(50% - 7px)!important;margin:12px 0 0!important;vertical-align:top}html[data-layout="web"] #menuScreen .dash-body>.dash-tile+.dash-tile{margin-left:10px!important}html[data-layout="web"] #menuScreen .dash-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+</style>
+
+</body></html>
