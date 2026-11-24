@@ -469,7 +469,7 @@ window.refreshCloud=async()=>{
 (async()=>{products=await all();render()})().catch(e=>{console.error(e);toast('저장소 초기화에 실패했습니다. Chrome에서 다시 열어 주세요.')});
 </script>
 <script>
-const units=['R-01','R-02','R-03','R-04','V-06','R-13','R-14','R-15','R-16','V-12','V-01','V-27','V-27B','V-28','V-28B'];
+const units=['R-01','R-02','R-03','R-04','V-06','R-13','R-14','R-15','R-16','R-12','V-01','V-27','V-27B','V-28','V-28B'];
 const baseStages=['원료투입','초기진공','반응','숙성','배출','세정'];
 let workData={},workSelected=null,workUnsub=null;
 function workOpen(){workSelected=null;workRender();workConnect();}
