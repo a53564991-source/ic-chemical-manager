@@ -202,7 +202,7 @@ html[data-layout="app"] .ws-empty{font-size:11px}
   <button id="detailBack" class="secondary" style="display:none;width:100%;margin-top:18px;padding:15px" onclick="closeView()">← 뒤로가기</button>
 </section>
 </main></div>
-<section id="workScreen" style="display:none;min-height:100vh"><header style="background:#173c6c"><button class="secondary small" onclick="showSection('menu')">‹ 홈</button><div style="display:flex;align-items:center;justify-content:flex-start;gap:14px;margin-top:12px"><h1>작업진행</h1><button id="workScheduleButton" class="secondary small" onclick="toggleWorkSchedule()">작업 스케줄 보기</button></div><p id="workStatus">연결 중</p></header><main><div id="workGrid"></div><div id="workSchedulePanel" style="display:none"></div><div id="workEditor" class="card" style="display:none"><button class="secondary small" onclick="workBack()">‹ 설비 목록</button><h2 id="workTitle" style="margin-top:16px"></h2><div class="field"><label>제품명</label><input id="workProduct"></div><div class="queue-box"><div style="display:flex;justify-content:space-between;align-items:center"><b>다음 작업</b><button type="button" class="secondary small" onclick="queueToggle()" id="queueToggleButton">편집</button></div><div id="queueList"></div><button type="button" id="queueAddButton" class="secondary small" style="display:none;margin-top:8px" onclick="queueAdd()">+ 제품 추가</button></div><div class="field"><label>공정</label><div class="inline"><select id="workStages" onchange="workStageChanged()"></select><button class="secondary small" onclick="workAdd()">+ 카테고리</button></div></div><div class="field"><label>작업 상태</label><select id="workState"><option>대기</option><option>진행 중</option><option>완료</option></select></div><div class="field"><label>시작시간</label><input id="workStart" type="datetime-local"><button class="secondary small" style="margin-top:8px" onclick="$('workStart').value=workLocal(new Date());$('workState').value='진행 중'">현재시간 입력</button></div><div class="field"><label>메모</label><textarea id="workMemo"></textarea></div><button id="workSaveButton" style="width:100%;background:#2563eb" onclick="workSave()">저장</button></div></main></section><section id="noticeScreen" style="display:none;min-height:100vh;background:#f3f6f4;padding:18px">
+<section id="workScreen" style="display:none;min-height:100vh"><header style="background:#173c6c"><button class="secondary small" onclick="showSection('menu')">‹ 홈</button><div style="display:flex;align-items:center;justify-content:flex-start;gap:14px;margin-top:12px"><h1>작업진행</h1><button id="workScheduleButton" class="secondary small" onclick="toggleWorkSchedule()">작업 스케줄 보기</button></div><p id="workStatus">연결 중</p></header><main><div id="workGrid"></div><div id="workSchedulePanel" style="display:none"></div><div id="workEditor" class="card" style="display:none"><button class="secondary small" onclick="workBack()">‹ 설비 목록</button><h2 id="workTitle" style="margin-top:16px"></h2><div class="field"><label>제품명</label><input id="workProduct"></div><div class="queue-box"><div style="display:flex;justify-content:space-between;align-items:center"><b>다음 작업</b><button type="button" class="secondary small" onclick="queueToggle()" id="queueToggleButton">편집</button></div><div id="queueList"></div><button type="button" id="queueAddButton" class="secondary small" style="display:none;margin-top:8px" onclick="queueAdd()">+ 제품 추가</button></div><div class="field"><label>공정</label><div class="inline"><select id="workStages" onchange="workStageChanged()"></select><button class="secondary small" onclick="workAdd()">+ 카테고리</button></div></div><div class="field"><label>작업 상태</label><select id="workState"><option>대기</option><option>진행 중</option><option>완료</option></select></div><div class="field"><label>시작시간</label><input id="workStart" type="datetime-local"><button class="secondary small" style="margin-top:8px" onclick="$('workStart').value=workLocal(new Date());$('workState').value='진행 중'">현재시간 입력</button></div><div class="field"><label>메모</label><textarea id="workMemo"></textarea></div><div class="actions"><button id="workCancelButton" class="secondary" onclick="workBack()">취소</button><button id="workSaveButton" style="background:#2563eb" onclick="workSave()">저장</button></div></div></main></section><section id="noticeScreen" style="display:none;min-height:100vh;background:#f3f6f4;padding:18px">
  <div style="max-width:680px;margin:auto">
  <button class="secondary small" onclick="showSection('menu')">← 메인으로</button>
  <h1 class="notice-heading">공지사항</h1>
@@ -306,6 +306,7 @@ window.retryAnonymousLogin=()=>{lock();};
 <script>
 let notices=[],noticeEditingId=null,noticePhotoData=[];
 function showSection(section){
+ if(section!=='work' && workSelected){workSelected=null;queueDraft=[];queueDirty=false;queueEditing=false;}
  if(window.hasEnteredApp && section!=='menu') armBack();
  $('scheduleScreen').style.display=section==='schedule'?'block':'none';if(section==='schedule'){scEditing=false;scOpen();}else scStop();
  $('workScreen').style.display=section==='work'?'block':'none';
@@ -547,15 +548,16 @@ const baseStages=['작업대기','원료투입','초기진공','반응','숙성'
 let workData={},workSelected=null,workUnsub=null;
 let queueDraft=[],queueEditing=false,queueDirty=false;
 function queueRender(){const el=$('queueList');$('queueToggleButton').textContent=queueEditing?'완료':'편집';$('queueAddButton').style.display=queueEditing?'inline-block':'none';el.innerHTML=queueDraft.length?queueDraft.map((v,i)=>queueEditing?`<div class="queue-row"><span>${i+1}</span><input aria-label="예정 제품 ${i+1}" value="${safe(v)}" oninput="queueDraft[${i}]=this.value;queueDirty=true"><button class="secondary" onclick="queueMove(${i},-1)" ${i===0?'disabled':''}>↑</button><button class="secondary" onclick="queueMove(${i},1)" ${i===queueDraft.length-1?'disabled':''}>↓</button><button class="danger" onclick="queueRemove(${i})">삭제</button></div>`:`<button type="button" class="secondary queue-promote" onclick="queuePromote(${i})" ${v.trim()?'':'disabled'}>${i+1}. ${safe(v)} <span>›</span></button>`).join(''):'<p class="queue-label">예정 제품 없음</p>';}
-async function queuePromote(i){
+function queuePromote(i){
  if(!workSelected||queueEditing||$('workSaveButton').disabled)return;
  const product=queueDraft[i]?.trim();if(!product)return;
  if(!confirm('다음 작업으로 진행할까요?\n'+product))return;
- const id=workSelected,prev=workData[id]||{};
- const d={id,product,stage:'작업대기',status:'대기',start:'',end:'',memo:'',queue:queueDraft.filter((_,j)=>j!==i).map(v=>v.trim()).filter(Boolean),categories:[...$('workStages').options].map(o=>o.value).filter(v=>!baseStages.includes(v)),updatedAt:new Date().toISOString()};
- const b=$('workSaveButton');b.disabled=true;
- try{await window.workAPI.save(d);workData[id]={...prev,...d};if(workSelected===id)workEdit(id);toast('다음 작업으로 전환 완료');}
- catch(e){alert('전환 실패: '+(e.code||e.message));}finally{b.disabled=false;}
+ $('workProduct').value=product;
+ $('workStages').value='작업대기';
+ $('workStart').value='';$('workMemo').value='';
+ workStateSync();
+ queueDraft.splice(i,1);queueDirty=true;queueRender();
+ toast('다음 작업 적용 · 저장 버튼을 눌러주세요');
 }
 function queueToggle(){queueEditing=!queueEditing;queueRender();}
 function queueAdd(){queueDraft.push('');queueDirty=true;queueRender();$('queueList').querySelector('.queue-row:last-child input')?.focus();}
@@ -574,8 +576,8 @@ function workStateSync(){const waiting=$('workStages').value==='작업대기';$(
 function workStageChanged(){$('workStart').value='';$('workState').value='대기';workStateSync();}
 function workLocal(d){return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);}
 function workAdd(){const s=prompt('추가할 공정 이름')?.trim();if(!s)return;const el=$('workStages');if(![...el.options].some(o=>o.value===s))el.add(new Option(s,s));el.value=s;workStageChanged();}
-function workBack(){workSelected=null;workRender();}
-async function workSave(){const id=workSelected;if(!id)return;const stage=$('workStages').value,status=stage==='작업대기'?'대기':$('workState').value,start=$('workStart').value;const prev=workData[id]||{};if(start&&new Date(start)>new Date()){alert('시작시간이 미래입니다.');return;}const d={id,...(queueDirty?{queue:queueDraft.map(v=>v.trim()).filter(Boolean)}:{}),product:$('workProduct').value.trim(),stage,status,start:start?new Date(start).toISOString():'',end:status==='완료'?(prev.status==='완료'&&prev.stage===stage&&prev.end?prev.end:new Date().toISOString()):'',memo:$('workMemo').value,categories:[...$('workStages').options].map(o=>o.value).filter(s=>!baseStages.includes(s)),updatedAt:new Date().toISOString()};const b=$('workSaveButton');b.disabled=true;try{await window.workAPI.save(d);workData[id]={...workData[id],...d};workBack();toast('작업현황 저장 완료');}catch(e){alert('저장 실패: '+(e.code||e.message));}finally{b.disabled=false;}}
+function workBack(){workSelected=null;queueDraft=[];queueDirty=false;queueEditing=false;workRender();}
+async function workSave(){const id=workSelected;if(!id)return;const stage=$('workStages').value,status=stage==='작업대기'?'대기':$('workState').value,start=$('workStart').value;const prev=workData[id]||{};if(start&&new Date(start)>new Date()){alert('시작시간이 미래입니다.');return;}const d={id,...(queueDirty?{queue:queueDraft.map(v=>v.trim()).filter(Boolean)}:{}),product:$('workProduct').value.trim(),stage,status,start:start?new Date(start).toISOString():'',end:status==='완료'?(prev.status==='완료'&&prev.stage===stage&&prev.end?prev.end:new Date().toISOString()):'',memo:$('workMemo').value,categories:[...$('workStages').options].map(o=>o.value).filter(s=>!baseStages.includes(s)),updatedAt:new Date().toISOString()};const b=$('workSaveButton');if(b.disabled)return;b.disabled=true;$('workCancelButton').disabled=true;try{await window.workAPI.save(d);workData[id]={...workData[id],...d};workBack();toast('작업현황 저장 완료');}catch(e){alert('저장 실패: '+(e.code||e.message));}finally{b.disabled=false;$('workCancelButton').disabled=false;}}
 setInterval(workTick,1000);
 
 let liveStops=[], liveQueue=Promise.resolve(), liveRetry;
